@@ -1,0 +1,51 @@
+﻿# =============== #
+# Unity generated #
+# =============== #
+Project/Temp
+Project/Obj
+Project/Library
+Project/ProjectSettings/ProjectVersion.txt
+ 
+# ============= #
+# IDE generated #
+# ============= #
+*.userprefs
+*.csproj
+*.pidb
+*.suo
+*.sln
+*.user
+*.unityproj
+*.booproj
+*.idc
+*.vs
+*.idea
+*JetBrains*
+*riderModule.iml
+*riderModule*
+ 
+# ============ #
+# OS generated #
+# ============ #
+.DS_Store*
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+[Tt]humbs.db
+
+# ================= #
+# UnityVS generated #
+# ================= #
+[Uu]nityVS
+[Uu]nityVS.meta
+
+# ========== #
+# Work stuff #
+# ========== #
+Project/Save
+Project/NetDelays.cfg
+Project/Assets/Resources/Config
+Project/Assets/Resources/Config.meta
+Project/Assets/_Tmp
+Stuff/EditorPath
