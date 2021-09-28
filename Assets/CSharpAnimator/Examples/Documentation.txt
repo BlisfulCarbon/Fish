@@ -1,0 +1,207 @@
+﻿CONTACT INFORMATION:
+
+Feel free to contact me for help or questions.
+Email: ben.brian.roscoe@gmail.com
+Unity Connect: https://connect.unity.com/u/5c5a9f1eedbc2a1efa2c131f
+Unity Forums: https://forum.unity.com/threads/released-c-animator.626536/
+
+INTRODUCTION:
+
+The CSharpAnimator allows you to generate a Unity animator using C# code. In my experience, this is extremely useful
+for dealing with animators of moderate to large complexity. For one, the animator is now described in text form, 
+meaning you can manipulate states and transitions much easier than in the Unity editor. I've found this alone extremely 
+useful, since copying and pasting states and transitions in the animator window is not always possible. Secondly, as can
+be seen in an example provided, we can procedurally generate states and transitions. I've personally found organising my states
+in a heirarchy based on gameplay logic useful as well. For example, in "ClassAdvancedTest", we have a state machine called
+"OnGround", which contains all the states and sub state machines where the player can perform a jump animation from. 
+When we're writing the transitions we can simply say, if the player is in any state included in the "OnGround" state machine,
+then they can jump, otherwise they can't. To support this, I've added the ability to specify whether a transitions source
+states should be a single state, a list of states, or recursively all states in a state machine.
+
+All these things together with the ability to run C# code to generate states and transitions makes this approach much
+more powerful in my opinion. In the end, when the animator is generated, you still get to visualise the graph(all node
+positions are saved when generating, so you don't have to keep moving them every time you regenerate.) and use it's 
+debugging features. The only downside is that you can't edit the graph in the Unity editor anymore without your 
+changes getting over written next time you generate.
+
+
+INSTRUCTIONS:
+
+The first step in creating a CSharp animator is inheriting from one of two available classes. You can inherit from the
+"CSharpAnimator" class directly. This class itself inherits from scriptable object, so your derived class must go in it's
+own file, and the class name and file name must match:
+
+For example, in ScriptableObjectAnimator.cs:
+
+	public class ScriptableObjectAnimator : CSharpAnimator
+	{
+		...
+	}
+
+Or you can inherit from "CSharpAnimator_ClassBase", which works the same, but eliminates the need to name the class the
+same as the file you place it in:
+
+	public class ClassAnimator : CSharpAnimator_ClassBase
+	{
+	    ...
+	}
+Using "CSharpAnimator_ClassBase" means you can also have multiple CSharp animators in one file.
+
+Once these classes are created, no matter which method you choose, you must override the "Construct" method and return
+a valid "AnimatorData" instance:
+
+   public class ClassAnimator : CSharpAnimator_ClassBase
+   {
+		public override AnimatorData Construct()
+		{
+			...
+		}
+   }
+
+AnimatorData is a class that holds all the information required to generate an animator. Instead of manually setting
+up your AnimatorData instance, there are a bunch of methods provided that you should call in a structured way. The 
+layout of these method calls are intended to be formatted in a readable way. Here's an example of a complete "Construct"
+method:
+
+	ParameterData speed = FloatParam("Speed");
+	ParameterData jumpTrigger = TriggerParam("JumpTrigger");
+	Animator
+	(
+		Graph()
+		[
+			Layer("Base").DefaultState("Idle")
+			[
+				State("Idle", idleMotion),
+				State("Run", runMotion),
+
+				StateMachine("CrouchableStates").Tag("JUMP_TAG")
+				[
+					State("Jump0", jumpMotion0),
+					State("Jump1", jumpMotion1),
+				]
+			]
+		],
+		
+		Transitions()
+		[
+			Transition().SourceMultiple("Idle", "Run").Destination("Jump")
+			[
+				Trigger(jumpTrigger)
+			],
+
+			Transition().Source("Jump").Destination("Idle").ExitTime(0.9f), 
+			
+			Transition().Source("Idle").Destination("Run")
+			[
+				Float(speed, speedForRun, ConditionMode.Greater)
+			],
+			Transition().Source("Run").Destination("Idle")
+			[
+				Float(speed, speedForRun, ConditionMode.Less)
+			]
+		]
+	);	
+	return currentData;
+
+In general, each element here is a method call to define a part of the animator, plus more method calls inside [] brackets.
+This allows us to specify the animator like a heirarchy. Most of these elements return an object that can have methods
+called on them to change certain properties of that element. For example:
+
+	State("Jump0", jumpMotion0).Speed(2.0f).Mirror(true)
+
+Will specify that we want a state called "Jump0", which plays the motion jumpMotion0(from editor exposed variables), 
+the speed is 2 times normal, and the motion is mirrored. Any parameter available to a particular element can be changed
+using this method and just chaining method calls:
+	Transition().Source("Jump").Destination("Idle").ExitTime(0.9f).TransitionTime(1.0f)
+
+Inside certain element's [] brackets, you can list other elements one after the other as if it was a method call.
+
+The general structure of the Construct method typically goes like this:
+	- Create parameters: Parameters are used through the ParameterData class. To create parameters call the *Param methods
+	And pass in the required method parametes for name, default value etc. Here are the available Parameter methods:
+
+		FloatParam(string name, float defaultValue = 0.0f)
+		BoolParam(string name, bool defaultValue = false)
+		IntParam(string name, int defaultValue = 0)
+		TriggerParam(string name)
+	These correspond to the parameters you can create in the Unity editor. Store these in local variables so we can pass
+	them onto the transition methods later on.
+
+	- Animator: This is the root method call. It expects you to pass in a graph and a group of transitions. It's mainly
+	 there because it needs to be syntactically, but you can think of it as "Create an entirely new animator, and it'll
+	 use this graph with these transitions."
+
+	- Graph: This is the root of the animator graph data. This call will return an object which you can use the [] operator
+	 with. Inside the [] brackets, the Graph object takes a variable amount of layer objects. This is the same as the
+	 animator window allowing you to create many layers in the one animator graph.
+		
+	- Layer: This describes a layer in the animator graph. Any parameters of the layer can be set by calling methods on
+	the object returned by the Layer() method call. Inside the [] brackets of the layer object, we can place a variable amount of
+	state and statemachine objects. When you create a layer, it automatically also creates a base state machine.
+
+	- StateMachine: The StateMachine call is used to define a state machine in the animator. Inside the [] brackets of
+	the StateMachine object, you can provide a variable amount of other StateMachines and Stats. This allows you to nest
+	StateMachines however you like. 
+
+	- State: States take a name and a motion parameter. This is a state in the animator graph and cannot have any children
+	States or StateMachines, so it has no overloaded [] operator.
+
+	- Transitions: This call is like the Graph() call. It just says that we are going to list all our transitions that
+	exists in the animator. All transitions for your animator go in the [] brackets here.
+
+	- Transition: Defines a single transition that will go into your animator. This requires a source state and a destination
+	state. Source states can be either just "Source"(single), "SourceMultiple"(an explicit list of states), or
+	"SourceRecursive"(recursively all states at or below the given state). Destination is always one single state.
+	Inside the [] brackets of Transition, you can provide a variable amount of TransitionConditions.
+
+	- TransitionConditions: These method calls return a TransitionCondition object that are used to create transition conditions.
+	The different conditions available are:
+		
+		Bool(ParameterData parameter, bool value)
+		Float(ParameterData parameter, float value, ConditionMode mode)
+		Int(ParameterData parameter, int value, ConditionMode mode)
+		Trigger(ParameterData parameter)
+	This is the same as adding transition conditions in the animator window on a particular transition. Pass in the
+	parameters you created earlier.
+
+
+NOTE: If you're inheriting from "CSharpAnimator", you'll have to create a way to access the scriptable object asset
+from the Unity editor. Here is the recommended way to do this with CSharpAnimator:
+
+	[MenuItem("Assets/Create/CSharpAnimator/Default Asset Name")]
+	public static void Create()
+	{
+		CreateWithType(typeof(<NameOfYourClassHere>));
+	}
+This will create a menu in Assets/Create that will automatically create an asset of your animator type.
+
+Once you've written the method to generate the animator data, you can create an CSharpAnimator asset in Unity. If you
+inherited from "CSharpAnimator", use your custom menu item to create your animator. If you inherited from "CSharpAnimator_ClassBase",
+you can create the animator by selecting "Assets/Create/CSharpAnimator/CSharpAnimator Class", then selecting your custom
+type from the drop down menu in the inspector and hitting the "Apply new type" button.
+
+Note that both these methods will create a Unity animator asset, and not a scriptable object. The CSharpAnimator scriptable
+object is stored as a sub asset inside the animator itself. This is just so you don't have to manage both an animator
+and a scriptable object used to generate it.
+
+Also note that all state names MUST be unique. In order for the transition elements to know which state you're refering to, 
+it needs to be given a unique way to identify that state. This is a tiny bit inconvenient, but in my experience hasn't been
+a problem.
+
+Code interacting with any part of CSharpAnimator should be editor only, since it's only purpose is to generate a
+Unity animator, which can only be done in the editor. Put all CSharpAnimator code in 
+	#if UNITY_EDITOR
+	#endif
+Otherwise you will get compile errors when making builds.
+
+EXAMPLES:
+For more advanced examples, look at CSharpAnimatorExamples.cs. These examples show how to use more advanced features,
+with lots of comments.
+
+Inside "Assets/CSharpAnimator/Examples/TestAssets" there are some test assets to help visualise the result of CSharpAnimator.
+Open "Assets/CSharpAnimator/Examples/TestAssets/Scene/TestScene.unity" and press play to see a basic test scene where the
+example animators are played on the Unity Ethan model. Press left and right on the keyboard to change between example animators,
+and you can manipulate all the parameters in the animators using UI elements.
+
+"Assets/CSharpAnimator/Examples/Animator/" contains all the example animator assets. These can be regenerated using the inspectors 
+for the assets.
